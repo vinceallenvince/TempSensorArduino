@@ -100,7 +100,8 @@ void loop(void)
   // now print out the temperature
   //float temp_c = (voltage - 0.5) * 100; //converting from 10 mv per degree wit 500 mV offset
                                         //to degrees ((voltage - 500mV) times 100)
-                                        
+  
+  // float temperatureC = ((reading * 0.004882) - 0.50) * 100; // some formula that seems to work                                      
   float temp_c = (voltage - 0.33) * 100; // using 3.33v line since 5v is being used by wifi shield
   Serial.print(temp_c); Serial.println(" degrees C");
   
