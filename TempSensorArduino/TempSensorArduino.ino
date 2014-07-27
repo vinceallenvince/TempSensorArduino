@@ -15,8 +15,8 @@
 Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ, ADAFRUIT_CC3000_VBAT,
                                          SPI_CLOCK_DIVIDER); // you can change this clock speed
 
-#define WLAN_SSID       "TG862G62"           // cannot be longer than 32 characters!
-#define WLAN_PASS       "TG862GE70762"
+#define WLAN_SSID       "NYCR24"           // cannot be longer than 32 characters!
+#define WLAN_PASS       "clubmate"
 // Security can be WLAN_SEC_UNSEC, WLAN_SEC_WEP, WLAN_SEC_WPA or WLAN_SEC_WPA2
 #define WLAN_SECURITY   WLAN_SEC_WPA2
 
