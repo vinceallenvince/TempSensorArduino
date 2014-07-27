@@ -3,6 +3,7 @@
 #include <SPI.h>
 #include <string.h>
 #include "utility/debug.h"
+#include "floatToString.h"
 
 // These are the interrupt and control pins
 #define ADAFRUIT_CC3000_IRQ   3  // MUST be an interrupt pin!
@@ -27,8 +28,6 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 #define WEBSITE      "http://162.243.120.32"
 #define WEBPAGE      ""
 
-boolean active = false;
-
 /**************************************************************************/
 /*!
     @brief  Sets up the HW and the CC3000 module (called automatically
@@ -37,6 +36,8 @@ boolean active = false;
 /**************************************************************************/
 
 uint32_t ip;
+
+int sensorPin = 0;
 
 void setup(void)
 {
@@ -80,55 +81,71 @@ void setup(void)
   
   Serial.print(F("connecting to --> ")); cc3000.printIPdotsRev(ip);
   Serial.println(F(""));
-  
-  active = true;
 }
   
 void loop(void)
 {
-  if (active) {
+  
+  // read temperature sensor
+  int temp_reading = analogRead(sensorPin);
+  float voltage = temp_reading * 3.3;
+  
+  voltage /= 1024.0;
+  Serial.print(voltage); Serial.println(" volts");
+  
+  // now print out the temperature
+  //float temp_c = (voltage - 0.5) * 100; //converting from 10 mv per degree wit 500 mV offset
+                                        //to degrees ((voltage - 500mV) times 100)
+                                        
+  float temp_c = (voltage - 0.33) * 100; // using 3.33v line since 5v is being used by wifi shield
+  Serial.print(temp_c); Serial.println(" degrees C");
+  
+  // now convert to Fahrenheit
+  float temp_f = (temp_c * 9.0 / 5.0) + 32.0;
+  Serial.print(temp_f); Serial.println(" degrees F");
+  
+  // connect to the IP address
+  Adafruit_CC3000_Client www = cc3000.connectTCP(ip, 8000);
+  
+  switch(sendDataToNode(www, temp_f)) {
+    case 1:
+      Serial.println(F("No response."));
+      break;
+    case 2:
     
-    Adafruit_CC3000_Client www = cc3000.connectTCP(ip, 8000);
+    Serial.println(F("-------------------------------------"));
     
-    switch(sendDataToNode(www)) {
-      case 1:
-        Serial.println(F("No response."));
-        break;
-      case 2:
-      
-      Serial.println(F("-------------------------------------"));
-      
-      /* Read data until either the connection is closed, or the idle timeout is reached. */ 
-      unsigned long lastRead = millis();
-      while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
-        while (www.available()) {
-          char c = www.read();
-          Serial.print(c);
-          lastRead = millis();
-        }
-      }      
-      
-        www.close();
-        Serial.println(F("\n\nDisconnecting..."));
-        cc3000.disconnect();
-        Serial.println(F("Connection closed."));
-        
-        active = false;
-    }
+    /* Read data until either the connection is closed, or the idle timeout is reached. */ 
+    unsigned long lastRead = millis();
+    while (www.connected() && (millis() - lastRead < IDLE_TIMEOUT_MS)) {
+      while (www.available()) {
+        char c = www.read();
+        Serial.print(c);
+        lastRead = millis();
+      }
+    }      
+    
+    www.close();
+    Serial.println(F("\n\nDisconnecting..."));
+    //cc3000.disconnect();
+    //Serial.println(F("Connection closed."));
   }
 
-  delay(1000);
-
+  delay(60000); // take a reading every minute
 }
 
-int sendDataToNode(Adafruit_CC3000_Client www) 
+int sendDataToNode(Adafruit_CC3000_Client www, float temperature) 
 {
   if (www.connected()) {
     Serial.println(F("Yay! Connected!!!"));
     
+    char buffer[5];
+    String str = floatToString(buffer, temperature, 5);
+    str.toCharArray(buffer, 5);
+    
     www.fastrprint(F("GET "));
     www.fastrprint(F("/?projectId=53d11aa2072719722f000000&writeKey=5c35ea887a5119bdac2263c7c817e865d40afe45aaa040ea0a4245ac81c589aa7b6d017850ada5068c9ac21538b11e7c795a693bd92a58365d8bfe3dd32eab2effb48755c09d75287caf6daac677d491cef7f79d746f3dc6a271c1b162c23d7e8b06d504c7ad72de6cfd9dc75f6aa5c9&temperature="));
-    www.fastrprint(F("130")); // temperature
+    www.fastrprint(buffer); // temperature
     www.fastrprint(F(" HTTP/1.1\r\n"));
     www.fastrprint(F("Host: ")); www.fastrprint(WEBSITE); www.fastrprint(F("\r\n"));
     www.fastrprint(F("\r\n"));
@@ -200,3 +217,4 @@ bool displayConnectionDetails(void)
     return true;
   }
 }
+
