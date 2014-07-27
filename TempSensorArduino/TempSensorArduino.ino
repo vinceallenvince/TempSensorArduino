@@ -26,7 +26,11 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 
 // What page to grab!
 #define WEBSITE      "http://162.243.120.32"
+#define WEBSITE_IP   162,243,120,32
 #define WEBPAGE      ""
+
+#define PROJECT_ID   ""  //replace with your project ID
+#define PROJECT_WRITE_KEY ""  // replace with your write key
 
 /**************************************************************************/
 /*!
@@ -77,7 +81,7 @@ void setup(void)
     delay(1000);
   }
   
-  ip = cc3000.IP2U32(162,243,120,32); // ENTER IP
+  ip = cc3000.IP2U32(WEBSITE_IP); // ENTER IP
   
   Serial.print(F("connecting to --> ")); cc3000.printIPdotsRev(ip);
   Serial.println(F(""));
@@ -144,7 +148,11 @@ int sendDataToNode(Adafruit_CC3000_Client www, float temperature)
     str.toCharArray(buffer, 5);
     
     www.fastrprint(F("GET "));
-    www.fastrprint(F("/?projectId=53d11aa2072719722f000000&writeKey=5c35ea887a5119bdac2263c7c817e865d40afe45aaa040ea0a4245ac81c589aa7b6d017850ada5068c9ac21538b11e7c795a693bd92a58365d8bfe3dd32eab2effb48755c09d75287caf6daac677d491cef7f79d746f3dc6a271c1b162c23d7e8b06d504c7ad72de6cfd9dc75f6aa5c9&temperature="));
+    www.fastrprint(F("/?projectId="));
+    www.fastrprint(F(PROJECT_ID));
+    www.fastrprint(F("&writeKey="));
+    www.fastrprint(F(PROJECT_WRITE_KEY));
+    www.fastrprint(F("&temperature="));
     www.fastrprint(buffer); // temperature
     www.fastrprint(F(" HTTP/1.1\r\n"));
     www.fastrprint(F("Host: ")); www.fastrprint(WEBSITE); www.fastrprint(F("\r\n"));
