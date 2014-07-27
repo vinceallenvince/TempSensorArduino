@@ -1,9 +1,11 @@
+
 #include <Adafruit_CC3000.h>
 #include <ccspi.h>
 #include <SPI.h>
 #include <string.h>
 #include "utility/debug.h"
 #include "floatToString.h"
+#include "keenConfig.h"
 
 // These are the interrupt and control pins
 #define ADAFRUIT_CC3000_IRQ   3  // MUST be an interrupt pin!
@@ -29,8 +31,9 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 #define WEBSITE_IP   162,243,120,32
 #define WEBPAGE      ""
 
-#define PROJECT_ID   ""  //replace with your project ID
-#define PROJECT_WRITE_KEY ""  // replace with your write key
+#define MOVING_AVG 20
+#define READ_DELAY 250
+#define SEND_DELAY 60000
 
 /**************************************************************************/
 /*!
@@ -42,6 +45,9 @@ Adafruit_CC3000 cc3000 = Adafruit_CC3000(ADAFRUIT_CC3000_CS, ADAFRUIT_CC3000_IRQ
 uint32_t ip;
 
 int sensorPin = 0;
+int readings[MOVING_AVG];
+short int first_reading = 1;
+long int acc_delay = 0;
 
 void setup(void)
 {
@@ -87,12 +93,36 @@ void setup(void)
   Serial.println(F(""));
 }
   
+int addReading(int reading) {
+  if (first_reading) {
+    for (int i = 0; i < MOVING_AVG; i++) {
+      readings[i] = reading;
+    }
+    first_reading = 0;
+  } else {
+    for (int j = 1; j < MOVING_AVG; j++) {
+      readings[j - 1] = readings[j]; 
+    }
+    readings[MOVING_AVG - 1] = reading;
+  }
+}
+
+int getAverageReading() {
+  long int total = 0;
+  for (unsigned int i = 0; i < MOVING_AVG; i++) {
+    total += readings[i];
+  } 
+  return total / MOVING_AVG;
+}  
+  
 void loop(void)
 {
   
   // read temperature sensor
   int temp_reading = analogRead(sensorPin);
-  float voltage = temp_reading * 3.3;
+  addReading(temp_reading);
+  int avg = getAverageReading();
+  float voltage = avg * 3.3;
   
   voltage /= 1024.0;
   Serial.print(voltage); Serial.println(" volts");
@@ -100,15 +130,29 @@ void loop(void)
   // now print out the temperature
   //float temp_c = (voltage - 0.5) * 100; //converting from 10 mv per degree wit 500 mV offset
                                         //to degrees ((voltage - 500mV) times 100)
-  
-  // float temperatureC = ((reading * 0.004882) - 0.50) * 100; // some formula that seems to work                                      
-  float temp_c = (voltage - 0.33) * 100; // using 3.33v line since 5v is being used by wifi shield
-  Serial.print(temp_c); Serial.println(" degrees C");
+                                        
+  float temp_c = ((avg * 0.004882) - 0.50) * 100; // some formula that seems to work  Serial.print(temp_c); Serial.println(" degrees C");
   
   // now convert to Fahrenheit
   float temp_f = (temp_c * 9.0 / 5.0) + 32.0;
   Serial.print(temp_f); Serial.println(" degrees F");
   
+  
+  if (acc_delay < SEND_DELAY) {
+    Serial.print(acc_delay);
+    Serial.print(" < ");
+    Serial.print(SEND_DELAY);
+    Serial.println(", not submitting yet.");
+    acc_delay += READ_DELAY;
+    delay(READ_DELAY);
+    return;
+  }
+  
+  // Accumulated Delay is > SEND_DELAY, so we send the current
+  // reading to the backend.
+  
+  // Reset delay accumulator.
+  acc_delay = 0;
   // connect to the IP address
   Adafruit_CC3000_Client www = cc3000.connectTCP(ip, 8000);
   
@@ -136,7 +180,6 @@ void loop(void)
     //Serial.println(F("Connection closed."));
   }
 
-  delay(60000); // take a reading every minute
 }
 
 int sendDataToNode(Adafruit_CC3000_Client www, float temperature) 
@@ -150,9 +193,9 @@ int sendDataToNode(Adafruit_CC3000_Client www, float temperature)
     
     www.fastrprint(F("GET "));
     www.fastrprint(F("/?projectId="));
-    www.fastrprint(F(PROJECT_ID));
+    www.fastrprint(F(KEEN_PROJECT_ID));
     www.fastrprint(F("&writeKey="));
-    www.fastrprint(F(PROJECT_WRITE_KEY));
+    www.fastrprint(F(KEEN_PROJECT_WRITE_KEY));
     www.fastrprint(F("&temperature="));
     www.fastrprint(buffer); // temperature
     www.fastrprint(F(" HTTP/1.1\r\n"));
